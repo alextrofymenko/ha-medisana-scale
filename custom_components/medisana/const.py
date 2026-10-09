@@ -22,18 +22,16 @@ SCALE_EPOCH_OFFSET = 1_262_304_000
 # stays open long enough for it (tested 30+s).
 ADVERTISEMENT_TO_SESSION_DELAY_SECONDS = 25.0
 
-# The scale only accepts a connection for a short window right after a
-# measurement. If we don't finish the history dump within this long, we bail
-# and wait for the next advertisement.
-CONNECT_TIMEOUT_SECONDS = 45.0
+# The scale sends its whole stored history, oldest first, on every sync. The
+# packets can come seconds apart, so a full dump can take well over a minute. If it isn't done within this long, we bail and wait for the
+# next advertisement.
+CONNECT_TIMEOUT_SECONDS = 120.0
 
-# After the final indication the scale takes a beat before it actively
-# disconnects. Empirically the BS444 can sit quiet for 4–5 seconds between
-# the Person packet and the follow-up Weight/Body packets, so a short quiet
-# window causes us to disconnect early and lose the body composition data.
-# The upstream keptenkurk/BS440 code just unconditionally sleeps 30s after
-# writing the command; a 10s quiet window is the safer equivalent.
-POST_PACKET_QUIET_SECONDS = 10.0
+# After the final indication the scale actively disconnects, which ends the
+# dump. Silence ends it only as a backstop: the BS444 can go 10 seconds
+# between packets in mid-dump. The upstream keptenkurk/BS440
+# code likewise sleeps 30s after writing the command.
+POST_PACKET_QUIET_SECONDS = 30.0
 
 MAX_USERS = 8
 

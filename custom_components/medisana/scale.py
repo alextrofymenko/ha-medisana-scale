@@ -49,6 +49,7 @@ class MedisanaScaleSession:
 
         self._last_packet_at: float = 0.0
         self._packet_event = asyncio.Event()
+        self._scale_hung_up = False
 
     async def fetch_measurements(self) -> list[UserMeasurement]:
         """Run one connect → collect → disconnect cycle.
@@ -62,6 +63,7 @@ class MedisanaScaleSession:
             client_class=BleakClient,
             device=self._ble_device,
             name=name,
+            disconnected_callback=self._on_disconnect,
             max_attempts=3,
         )
         _LOGGER.info("Connected to %s, subscribing to indication chars", name)
@@ -92,15 +94,16 @@ class MedisanaScaleSession:
         return self._merge()
 
     async def _wait_for_dump_to_settle(self) -> None:
-        """Wait until either the overall timeout elapses or packets stop arriving.
+        """Wait until the scale hangs up, falls silent, or time runs out.
 
-        We give the scale up to CONNECT_TIMEOUT_SECONDS in total, but bail early
-        once POST_PACKET_QUIET_SECONDS pass with no new packets after at least
-        one arrived — that's the signature of a finished history dump.
+        The scale disconnects by itself after its last packet, which is the
+        normal end of a dump. Silence for POST_PACKET_QUIET_SECONDS after at
+        least one packet also ends it, and CONNECT_TIMEOUT_SECONDS caps the
+        whole wait.
         """
         deadline = time.monotonic() + CONNECT_TIMEOUT_SECONDS
 
-        while True:
+        while not self._scale_hung_up:
             remaining_total = deadline - time.monotonic()
             if remaining_total <= 0:
                 return
@@ -121,6 +124,11 @@ class MedisanaScaleSession:
             self._packet_event.clear()
 
     # -- notification callbacks ------------------------------------------------
+
+    def _on_disconnect(self, _client: BleakClient) -> None:
+        _LOGGER.debug("Scale disconnected")
+        self._scale_hung_up = True
+        self._packet_event.set()
 
     def _touch(self) -> None:
         self._last_packet_at = time.monotonic()
