@@ -23,10 +23,12 @@ from homeassistant.components.bluetooth import (
     async_register_callback,
 )
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
+from homeassistant.helpers.storage import Store
 
-from .const import ADVERTISEMENT_TO_SESSION_DELAY_SECONDS, SERVICE_UUID
+from .const import ADVERTISEMENT_TO_SESSION_DELAY_SECONDS, DOMAIN, SERVICE_UUID
 from .parser import UserMeasurement
 from .scale import MedisanaScaleSession
+from .selection import newer_than, newest
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -80,10 +82,16 @@ class MedisanaBSCoordinator:
         # schedules a session if we see it. Works around cases where HA's
         # callback dispatcher doesn't fire for subsequent advertisements.
         self._poll_task: asyncio.Task[None] | None = None
-        # Most recent measurement we've seen per (user_id, timestamp). We
-        # dedupe across sessions so the same historical reading doesn't fire
-        # listeners every time the scale wakes up.
-        self._seen_keys: set[tuple[int, int]] = set()
+        # Timestamp of the newest reading passed on per user slot, and across
+        # all slots. Every sync repeats the scale's stored history, so only
+        # readings newer than these reach the sensors. Stored, so a restart
+        # doesn't let older readings replace newer values.
+        self._latest_by_user: dict[int, int] = {}
+        self._latest_any: int = 0
+        self._store: Store[dict[str, Any]] = Store(
+            hass, 1, f"{DOMAIN}.{self.address.replace(':', '')}"
+        )
+        self._newest_listeners: list[MeasurementListener] = []
         # Most recent UserMeasurement per user_id. Platforms adding entities
         # lazily (when a new user slot shows up in a session) read this to
         # pre-seed the entity's value with the measurement that triggered it.
@@ -95,6 +103,9 @@ class MedisanaBSCoordinator:
         self._latest_service_info: BluetoothServiceInfoBleak | None = None
 
     async def async_start(self) -> None:
+        stored = await self._store.async_load() or {}
+        self._latest_by_user = {int(k): v for k, v in stored.get("users", {}).items()}
+        self._latest_any = stored.get("any", 0)
         _LOGGER.info(
             "Coordinator starting; listening for advertisements from scale %s",
             self.address,
@@ -126,13 +137,12 @@ class MedisanaBSCoordinator:
             self._poll_task = None
 
     def add_listener(self, listener: MeasurementListener) -> Callable[[], None]:
-        self._listeners.append(listener)
+        """Listen for each reading newer than its user slot's latest."""
+        return _add(self._listeners, listener)
 
-        def _remove() -> None:
-            if listener in self._listeners:
-                self._listeners.remove(listener)
-
-        return _remove
+    def add_newest_listener(self, listener: MeasurementListener) -> Callable[[], None]:
+        """Listen for the one reading per sync that is newer than any before."""
+        return _add(self._newest_listeners, listener)
 
     def add_availability_listener(
         self, listener: Callable[[bool], None]
@@ -264,14 +274,10 @@ class MedisanaBSCoordinator:
         if not measurements:
             return
 
-        new_count = 0
-        for measurement in measurements:
-            key = (measurement.user_id, measurement.timestamp)
-            if key in self._seen_keys:
-                continue
-            self._seen_keys.add(key)
+        current = newer_than(measurements, self._latest_by_user, int(time.time()))
+        for measurement in current:
+            self._latest_by_user[measurement.user_id] = measurement.timestamp
             self._latest_per_user[measurement.user_id] = measurement
-            new_count += 1
             _LOGGER.debug(
                 "New measurement: user=%s weight=%s kg "
                 "fat=%s%% water=%s%% muscle=%s%% bone=%s%% kcal=%s",
@@ -283,12 +289,22 @@ class MedisanaBSCoordinator:
                 measurement.bone_pct,
                 measurement.kcal,
             )
-            for listener in list(self._listeners):
-                try:
-                    listener(measurement)
-                except Exception:  # noqa: BLE001
-                    _LOGGER.exception("Measurement listener raised")
-        _LOGGER.info("Dispatched %d new measurement(s) to listeners", new_count)
+            _notify(self._listeners, measurement)
+        if (overall := newest(current, self._latest_any)) is not None:
+            self._latest_any = overall.timestamp
+            _notify(self._newest_listeners, overall)
+        if current:
+            await self._store.async_save(
+                {
+                    "users": {str(k): v for k, v in self._latest_by_user.items()},
+                    "any": self._latest_any,
+                }
+            )
+        _LOGGER.info(
+            "Dispatched %d of %d measurement(s) as newer than those shown",
+            len(current),
+            len(measurements),
+        )
 
     def latest_for_user(self, user_id: int) -> UserMeasurement | None:
         """Return the most recent measurement stored for a given user slot."""
@@ -303,5 +319,24 @@ class MedisanaBSCoordinator:
             "address": self.address,
             "available": self.available,
             "last_seen": self.last_seen,
-            "seen_keys": sorted(self._seen_keys),
+            "latest_by_user": self._latest_by_user,
+            "latest_any": self._latest_any,
         }
+
+
+def _add(listeners: list[MeasurementListener], listener: MeasurementListener) -> Callable[[], None]:
+    listeners.append(listener)
+
+    def _remove() -> None:
+        if listener in listeners:
+            listeners.remove(listener)
+
+    return _remove
+
+
+def _notify(listeners: list[MeasurementListener], measurement: UserMeasurement) -> None:
+    for listener in list(listeners):
+        try:
+            listener(measurement)
+        except Exception:  # noqa: BLE001
+            _LOGGER.exception("Measurement listener raised")

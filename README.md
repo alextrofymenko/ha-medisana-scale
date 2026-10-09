@@ -133,6 +133,7 @@ Things the integration genuinely can't fix on its own:
 
 - **The scale's firmware sometimes tags completed weighings as "guest"** even with a user profile configured and the scale displaying `P1`–`P8`. When it does, body-composition fields are zero and the reading only lands on `Latest weight` (not the per-user device). There's no pattern to when this happens — firmware quirk. The scale still stores the reading internally; on a later weighing it may re-emit the missed ones attributed to the right user.
 - **The BS444's BLE window is short and weak.** If your Bluetooth adapter / ESPHome proxy is more than ~2–3 m from the scale, advertisements get dropped and weighings can be missed entirely. We recommend either keeping the scale close to an adapter or setting up a dedicated [ESPHome Bluetooth proxy](https://esphome.io/components/bluetooth_proxy.html) near the scale.
+- **Older readings never replace newer ones.** Every sync repeats the scale's stored history, oldest first. Only readings newer than the one a user's sensors already show update them, so a sync that is cut short, or comes after a restart, can't put an old weighing back on the dashboard. The stored history itself is not imported.
 - **Missed weighings aren't lost forever.** The scale keeps each reading flagged "unsynced" until it's been successfully transmitted once. A later, successful connect will dump everything that's still pending, so skipped weighings catch up on the next good sync.
 
 ## Troubleshooting

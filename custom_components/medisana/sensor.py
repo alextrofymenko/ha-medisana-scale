@@ -376,7 +376,7 @@ class MedisanaBSSensor(MedisanaBSUserEntity, SensorEntity):
 
 
 class MedisanaBSLastWeightSensor(MedisanaBSScaleEntity, SensorEntity):
-    """Scale-level 'latest weight' sensor — updates on any reading.
+    """Scale-level 'latest weight' sensor — follows the newest reading.
 
     Unlike the per-user weight sensors, this one updates for every weighing
     the scale transmits, including anonymous / guest weighings where the
@@ -394,9 +394,6 @@ class MedisanaBSLastWeightSensor(MedisanaBSScaleEntity, SensorEntity):
     def __init__(self, coordinator: MedisanaBSCoordinator) -> None:
         super().__init__(coordinator, "last_weight")
         self._value: float | None = None
-        # Track the timestamp of the reading we're displaying so out-of-order
-        # history replays don't cause the sensor to regress to an older value.
-        self._latest_ts: int = 0
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -409,15 +406,14 @@ class MedisanaBSLastWeightSensor(MedisanaBSScaleEntity, SensorEntity):
             except (TypeError, ValueError):
                 self._value = None
 
-        self.async_on_remove(self._coordinator.add_listener(self._handle_measurement))
+        self.async_on_remove(
+            self._coordinator.add_newest_listener(self._handle_measurement)
+        )
 
     @callback
     def _handle_measurement(self, measurement: UserMeasurement) -> None:
         if measurement.weight_kg is None:
             return
-        if measurement.timestamp and measurement.timestamp < self._latest_ts:
-            return
-        self._latest_ts = measurement.timestamp or self._latest_ts
         self._value = measurement.weight_kg
         self.async_write_ha_state()
 
@@ -450,16 +446,13 @@ class MedisanaBSLastWeighingSensor(MedisanaBSScaleEntity, SensorEntity):
             except (TypeError, ValueError):
                 self._value = None
 
-        self.async_on_remove(self._coordinator.add_listener(self._handle_measurement))
+        self.async_on_remove(
+            self._coordinator.add_newest_listener(self._handle_measurement)
+        )
 
     @callback
     def _handle_measurement(self, measurement: UserMeasurement) -> None:
-        if not measurement.timestamp:
-            return
-        incoming = datetime.fromtimestamp(measurement.timestamp, tz=timezone.utc)
-        if self._value is not None and incoming < self._value:
-            return
-        self._value = incoming
+        self._value = datetime.fromtimestamp(measurement.timestamp, tz=timezone.utc)
         self.async_write_ha_state()
 
     @property
