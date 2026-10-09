@@ -4,6 +4,8 @@
 
 > **Disclaimer:** unofficial, community-made integration. Not affiliated with, endorsed by, or supported by Medisana. Use at your own risk.
 
+> **Fork:** this is a fork of [andriensis/ha-medisana-scale](https://github.com/andriensis/ha-medisana-scale), the original integration, with fixes from testing on a BS444. The [releases](https://github.com/alextrofymenko/ha-medisana-scale/releases) list what changed.
+
 A Home Assistant custom integration for the **Medisana BS444 Connect** Bluetooth body composition scale (and its siblings BS410 / BS430 / BS440 — they share the same BLE protocol).
 
 Reads weight, BMI and BMI category, body fat %, body water %, muscle %, bone, basal metabolism (kcal), and per-user profile data (age, height, gender, activity level) for up to 8 scale users — directly, over Bluetooth.
@@ -43,12 +45,12 @@ Body composition (fat %, body water %, muscle %, bone, basal metabolism) is **on
 
 **Step 1 — add the repository to HACS:**
 
-[![Add Repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=andriensis&repository=ha-medisana-scale&category=integration)
+[![Add Repository](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=alextrofymenko&repository=ha-medisana-scale&category=integration)
 
 Click the button above to add the repository. This opens HACS in your Home Assistant and adds the Medisana repository. If the button doesn't work, add it manually:
 
 1. Open **HACS** → **Integrations** → click the three-dot menu (top right) → **Custom repositories**
-2. Paste `https://github.com/andriensis/ha-medisana-scale/` as the URL
+2. Paste `https://github.com/alextrofymenko/ha-medisana-scale/` as the URL
 3. Select **Integration** as the category and click **Add**
 
 **Step 2 — download the integration:**
