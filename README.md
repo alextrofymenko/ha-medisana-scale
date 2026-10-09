@@ -88,6 +88,8 @@ Two things commonly trip people up on first use:
 
 **2. If the scale didn't recognise you, the reading goes to "Latest weight".** When the scale identifies you as one of its eight user slots, the full data (weight + body composition) lands on the matching per-user device (`Medisana scale user 1`, or `Alice`, etc.). When it *doesn't* — quick step-ons, shoes on, weight too far from the slot's baseline, no profile at all — the reading is tagged as guest. Body composition will be zero (the scale can't compute it without a profile), but the weight **is still captured** and lands on the top-level **Medisana scale** device under the `Latest weight` + `Last weighing` sensors. So you never lose a weigh-in, you just don't get body composition for it.
 
+**3. Past weighings show in the history chart on the hour they were taken.** Every sync writes the readings the scale has stored into the long-term statistics of each per-user sensor with a numeric value. Home Assistant's history chart draws a sensor's past from those statistics. So weighings from before you set up the integration appear on their own dates.
+
 ## Entities
 
 Each configured scale produces one top-level **Medisana scale** device (the hardware) and up to eight **per-user sub-devices** (one per scale user slot 1–8). The per-user sub-devices are **created lazily** — a user 1 device only appears the first time the scale attributes a weighing to slot 1. Unused slots never clutter your Devices page.
@@ -135,7 +137,9 @@ Things the integration genuinely can't fix on its own:
 
 - **The scale's firmware sometimes tags completed weighings as "guest"** even with a user profile configured and the scale displaying `P1`–`P8`. When it does, body-composition fields are zero and the reading only lands on `Latest weight` (not the per-user device). There's no pattern to when this happens — firmware quirk. The scale still stores the reading internally; on a later weighing it may re-emit the missed ones attributed to the right user.
 - **The BS444's BLE window is short and weak.** If your Bluetooth adapter / ESPHome proxy is more than ~2–3 m from the scale, advertisements get dropped and weighings can be missed entirely. We recommend either keeping the scale close to an adapter or setting up a dedicated [ESPHome Bluetooth proxy](https://esphome.io/components/bluetooth_proxy.html) near the scale.
-- **Older readings never replace newer ones.** Every sync repeats the scale's stored history, oldest first. Only readings newer than the one a user's sensors already show update them, so a sync that is cut short, or comes after a restart, can't put an old weighing back on the dashboard. The stored history itself is not imported.
+- **Older readings never replace newer ones.** Every sync repeats the scale's stored history, oldest first. Only readings newer than the one a user's sensors already show update them, so a sync that is cut short, or comes after a restart, can't put an old weighing back on the dashboard. The stored history goes into the long-term statistics instead.
+- **The history chart shows stored readings by the hour.** Two weighings in the same hour show as their average. A reading's hour is written only once it has been over for an hour. Home Assistant first compiles each hour from the sensor's own values, and writing it earlier clashes with that.
+- **Late weighings take a while to show in the history chart.** The chart only uses long-term statistics from before a sensor's oldest detailed history. A weighing that arrives days late shows there once Home Assistant purges that history, after 10 days by default. A Statistics graph card shows it straight away.
 - **Missed weighings aren't lost forever.** The scale keeps each reading flagged "unsynced" until it's been successfully transmitted once. A later, successful connect will dump everything that's still pending, so skipped weighings catch up on the next good sync.
 
 ## Troubleshooting

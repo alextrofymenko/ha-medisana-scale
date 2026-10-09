@@ -48,6 +48,7 @@ _POLL_INTERVAL_SECONDS = 5.0
 
 
 MeasurementListener = Callable[[UserMeasurement], None]
+SyncListener = Callable[[list[UserMeasurement]], None]
 
 
 class MedisanaBSCoordinator:
@@ -93,6 +94,7 @@ class MedisanaBSCoordinator:
             hass, 1, f"{DOMAIN}.{self.address.replace(':', '')}"
         )
         self._newest_listeners: list[MeasurementListener] = []
+        self._sync_listeners: list[SyncListener] = []
         # Most recent UserMeasurement per user_id. Platforms adding entities
         # lazily (when a new user slot shows up in a session) read this to
         # pre-seed the entity's value with the measurement that triggered it.
@@ -144,6 +146,10 @@ class MedisanaBSCoordinator:
     def add_newest_listener(self, listener: MeasurementListener) -> Callable[[], None]:
         """Listen for the one reading per sync that is newer than any before."""
         return _add(self._newest_listeners, listener)
+
+    def add_sync_listener(self, listener: SyncListener) -> Callable[[], None]:
+        """Listen for every reading of each sync, older ones included."""
+        return _add(self._sync_listeners, listener)
 
     def add_availability_listener(
         self, listener: Callable[[bool], None]
@@ -299,6 +305,7 @@ class MedisanaBSCoordinator:
         if (overall := newest(current, self._latest_any)) is not None:
             self._latest_any = overall.timestamp
             _notify(self._newest_listeners, overall)
+        _notify(self._sync_listeners, measurements)
         if current:
             await self._store.async_save(
                 {
@@ -330,7 +337,7 @@ class MedisanaBSCoordinator:
         }
 
 
-def _add(listeners: list[MeasurementListener], listener: MeasurementListener) -> Callable[[], None]:
+def _add[L](listeners: list[L], listener: L) -> Callable[[], None]:
     listeners.append(listener)
 
     def _remove() -> None:
@@ -340,9 +347,9 @@ def _add(listeners: list[MeasurementListener], listener: MeasurementListener) ->
     return _remove
 
 
-def _notify(listeners: list[MeasurementListener], measurement: UserMeasurement) -> None:
+def _notify[T](listeners: list[Callable[[T], None]], value: T) -> None:
     for listener in list(listeners):
         try:
-            listener(measurement)
+            listener(value)
         except Exception:  # noqa: BLE001
             _LOGGER.exception("Measurement listener raised")

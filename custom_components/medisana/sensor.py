@@ -1,11 +1,18 @@
 """Per-user sensor entities for the Medisana scale."""
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
+from homeassistant.components.recorder import DOMAIN as RECORDER_DOMAIN
+from homeassistant.components.recorder.models import StatisticMeanType
+from homeassistant.components.recorder.statistics import (
+    STATISTIC_UNIT_TO_UNIT_CONVERTER,
+    async_import_statistics,
+)
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -33,6 +40,7 @@ from .entity import (
     MedisanaBSUserEntity,
     resolve_user_display_name,
 )
+from .hourly import hourly_statistics
 from .parser import UserMeasurement
 
 import logging
@@ -296,6 +304,10 @@ class MedisanaBSSensor(MedisanaBSUserEntity, SensorEntity):
         self.async_on_remove(
             self._coordinator.add_listener(self._handle_measurement)
         )
+        if self.entity_description.state_class is not None:
+            self.async_on_remove(
+                self._coordinator.add_sync_listener(self._import_statistics)
+            )
 
         # BMI category is a derived sensor: its value is a pure function of
         # the numeric BMI sensor's value. Watch that sibling so the category
@@ -366,6 +378,40 @@ class MedisanaBSSensor(MedisanaBSUserEntity, SensorEntity):
             return
         self._value = new_value
         self.async_write_ha_state()
+
+    @callback
+    def _import_statistics(self, measurements: list[UserMeasurement]) -> None:
+        """Put this sensor's stored readings into its hourly statistics.
+
+        The metadata matches what the recorder writes for the sensor itself,
+        so the two keep writing to one statistic without changing it.
+        """
+        value_fn = self.entity_description.value_fn
+        statistics = hourly_statistics(
+            (
+                (m.timestamp, value_fn(m))
+                for m in measurements
+                if m.user_id == self._user_id
+            ),
+            int(time.time()),
+        )
+        if not statistics:
+            return
+        unit = self.native_unit_of_measurement
+        converter = STATISTIC_UNIT_TO_UNIT_CONVERTER.get(unit)
+        async_import_statistics(
+            self.hass,
+            {
+                "mean_type": StatisticMeanType.ARITHMETIC,
+                "has_sum": False,
+                "name": None,
+                "source": RECORDER_DOMAIN,
+                "statistic_id": self.entity_id,
+                "unit_class": converter.UNIT_CLASS if converter else None,
+                "unit_of_measurement": unit,
+            },
+            statistics,
+        )
 
     @property
     def native_value(self) -> Any:
