@@ -16,16 +16,11 @@ CHAR_COMMAND = "00008a81-0000-1000-8000-00805f9b34fb"
 SCALE_EPOCH_OFFSET = 1_262_304_000
 
 # The scale starts advertising BEFORE it has finished the body-composition
-# analysis. If we connect and issue the sync command immediately, the scale
-# dumps its current history (which doesn't yet include the in-progress
-# weighing) and considers the BLE cycle done. The weighing then lands in
-# history but we never get a second chance to pull it.
-#
-# Empirically the scale takes ~8–10 seconds after the BLE window opens to
-# commit the body-comp result. Delaying our connection by this long lets the
-# weighing finish first, then our sync command returns the fresh reading.
-# The scale's BLE window stays open long enough for this (tested 30+s).
-ADVERTISEMENT_TO_SESSION_DELAY_SECONDS = 12.0
+# analysis. A sync command sent before the weighing is committed gets a stale
+# record from history instead of the new weighing. Waiting this long after the
+# first advertisement lets the weighing commit first; the scale's BLE window
+# stays open long enough for it (tested 30+s).
+ADVERTISEMENT_TO_SESSION_DELAY_SECONDS = 25.0
 
 # The scale only accepts a connection for a short window right after a
 # measurement. If we don't finish the history dump within this long, we bail
