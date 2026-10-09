@@ -106,7 +106,7 @@ class MedisanaBSCoordinator:
             BluetoothCallbackMatcher(service_uuid=SERVICE_UUID),
             BluetoothScanningMode.ACTIVE,
         )
-        self._poll_task = self.hass.async_create_task(self._poll_loop())
+        self._poll_task = self.hass.async_create_background_task(self._poll_loop(), "medisana_poll_loop")
 
     async def async_stop(self) -> None:
         if self._unregister_bluetooth is not None:
