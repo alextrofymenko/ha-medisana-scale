@@ -8,7 +8,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from .const import DOMAIN, MAX_USERS
+from .const import DOMAIN, MANUFACTURER, MAX_USERS
 from .coordinator import MedisanaBSCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -21,6 +21,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     address: str = entry.data["address"]
 
     coordinator = MedisanaBSCoordinator(hass, address)
+    # User-slot devices link to the scale device by its registry id, so the
+    # scale device has to exist before any of their entities are added.
+    coordinator.scale_device_id = dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, coordinator.address)},
+        name="Medisana scale",
+        manufacturer=MANUFACTURER,
+        model="BS4xx",
+    ).id
     await coordinator.async_start()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator

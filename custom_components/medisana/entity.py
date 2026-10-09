@@ -89,7 +89,7 @@ class MedisanaBSUserEntity(RestoreEntity, Entity):
             name=user_display_name,
             manufacturer=MANUFACTURER,
             model="BS4xx",
-            via_device=(DOMAIN, coordinator.address),
+            via_device_id=coordinator.scale_device_id,
         )
 
     async def async_added_to_hass(self) -> None:

@@ -57,6 +57,8 @@ class MedisanaBSCoordinator:
         self.address = address.lower()
         self.last_seen: float | None = None
         self.available: bool = False
+        # Device registry id of the scale device; set during entry setup.
+        self.scale_device_id: str | None = None
 
         self._listeners: list[MeasurementListener] = []
         self._availability_listeners: list[Callable[[bool], None]] = []

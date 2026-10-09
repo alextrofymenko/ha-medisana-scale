@@ -19,7 +19,7 @@ Reads weight, BMI and BMI category, body fat %, body water %, muscle %, bone, ba
 
 ## Requirements
 
-- Home Assistant 2024.8 or later with a working Bluetooth stack (built-in adapter or an [ESPHome Bluetooth proxy](https://esphome.io/components/bluetooth_proxy.html))
+- Home Assistant 2026.8 or later with a working Bluetooth stack (built-in adapter or an [ESPHome Bluetooth proxy](https://esphome.io/components/bluetooth_proxy.html))
 - A Medisana BS-series scale with **at least one user profile configured on the scale itself** (see below)
 
 ### About the user profiles
