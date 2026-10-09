@@ -132,7 +132,6 @@ SENSOR_DESCRIPTIONS: tuple[MedisanaBSSensorDescription, ...] = (
     MedisanaBSSensorDescription(
         key="kcal",
         name="Basal metabolism",
-        device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfEnergy.KILO_CALORIE,
         value_fn=lambda m: m.kcal,
