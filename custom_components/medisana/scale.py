@@ -127,32 +127,32 @@ class MedisanaScaleSession:
         self._packet_event.set()
 
     def _on_person(self, _sender, data: bytearray) -> None:
-        _LOGGER.warning("[MEDISANA-DEBUG] RAW Person (%d) %s", len(data), bytes(data).hex())
+        _LOGGER.debug("RAW Person (%d) %s", len(data), bytes(data).hex())
         parsed = Person.decode(bytes(data))
         if parsed is None:
-            _LOGGER.warning("[MEDISANA-DEBUG] Ignored malformed Person packet: %s", data.hex())
+            _LOGGER.debug("Ignored malformed Person packet: %s", data.hex())
             return
-        _LOGGER.warning("[MEDISANA-DEBUG] Decoded Person: %s", parsed)
+        _LOGGER.debug("Decoded Person: %s", parsed)
         self._persons.append(parsed)
         self._touch()
 
     def _on_weight(self, _sender, data: bytearray) -> None:
-        _LOGGER.warning("[MEDISANA-DEBUG] RAW Weight (%d) %s", len(data), bytes(data).hex())
+        _LOGGER.debug("RAW Weight (%d) %s", len(data), bytes(data).hex())
         parsed = Weight.decode(bytes(data))
         if parsed is None:
-            _LOGGER.warning("[MEDISANA-DEBUG] Ignored malformed Weight packet: %s", data.hex())
+            _LOGGER.debug("Ignored malformed Weight packet: %s", data.hex())
             return
-        _LOGGER.warning("[MEDISANA-DEBUG] Decoded Weight: %s", parsed)
+        _LOGGER.debug("Decoded Weight: %s", parsed)
         self._weights.append(parsed)
         self._touch()
 
     def _on_body(self, _sender, data: bytearray) -> None:
-        _LOGGER.warning("[MEDISANA-DEBUG] RAW Body (%d) %s", len(data), bytes(data).hex())
+        _LOGGER.debug("RAW Body (%d) %s", len(data), bytes(data).hex())
         parsed = Body.decode(bytes(data))
         if parsed is None:
-            _LOGGER.warning("[MEDISANA-DEBUG] Ignored malformed Body packet: %s", data.hex())
+            _LOGGER.debug("Ignored malformed Body packet: %s", data.hex())
             return
-        _LOGGER.warning("[MEDISANA-DEBUG] Decoded Body: %s", parsed)
+        _LOGGER.debug("Decoded Body: %s", parsed)
         self._bodies.append(parsed)
         self._touch()
 

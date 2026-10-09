@@ -243,8 +243,8 @@ async def async_setup_entry(
     @callback
     def _on_measurement(measurement: UserMeasurement) -> None:
         uid = measurement.user_id
-        _LOGGER.warning(
-            "[MEDISANA-DEBUG] sensor._on_measurement fired: user=%s weight=%s added=%s",
+        _LOGGER.debug(
+            "sensor._on_measurement fired: user=%s weight=%s added=%s",
             uid, measurement.weight_kg, sorted(added_users),
         )
         if uid < 1 or uid > MAX_USERS:
@@ -252,8 +252,8 @@ async def async_setup_entry(
         if uid in added_users:
             return
         added_users.add(uid)
-        _LOGGER.warning(
-            "[MEDISANA-DEBUG] First measurement for user slot %d — creating per-user entities",
+        _LOGGER.debug(
+            "First measurement for user slot %d — creating per-user entities",
             uid,
         )
         new_entities = _entities_for_user(uid)

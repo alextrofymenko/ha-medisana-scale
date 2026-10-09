@@ -260,7 +260,7 @@ class MedisanaBSCoordinator:
             )
             return
 
-        _LOGGER.warning("[MEDISANA-DEBUG] Opening BLE session with %s", self.address)
+        _LOGGER.debug("Opening BLE session with %s", self.address)
         session = MedisanaScaleSession(ble_device)
         try:
             measurements = await session.fetch_measurements()
@@ -272,8 +272,8 @@ class MedisanaBSCoordinator:
             )
             return
 
-        _LOGGER.warning(
-            "[MEDISANA-DEBUG] BLE session with %s returned %d measurement(s)",
+        _LOGGER.debug(
+            "BLE session with %s returned %d measurement(s)",
             self.address,
             len(measurements),
         )
@@ -288,8 +288,8 @@ class MedisanaBSCoordinator:
             self._seen_keys.add(key)
             self._latest_per_user[measurement.user_id] = measurement
             new_count += 1
-            _LOGGER.warning(
-                "[MEDISANA-DEBUG] New measurement: user=%s weight=%s kg "
+            _LOGGER.debug(
+                "New measurement: user=%s weight=%s kg "
                 "fat=%s%% water=%s%% muscle=%s%% bone=%s%% kcal=%s",
                 measurement.user_id,
                 measurement.weight_kg,
