@@ -73,11 +73,12 @@ class MedisanaBSCoordinator:
         self._session_lock = asyncio.Lock()
         # Debounce: the scale advertises continuously while in its BLE window
         # (multiple adverts per second). We only want one session per BLE
-        # window. `_last_session_scheduled_at` is monotonic time of the most
-        # recent scheduled session; attempts within _SESSION_COOLDOWN of it
-        # are ignored. One session reliably drains all unsynced history so
-        # this doesn't lose data even if many weighings happened.
-        self._last_session_scheduled_at: float = 0.0
+        # window, so no session is scheduled while one is pending or running,
+        # nor within _SESSION_COOLDOWN of one being scheduled or finishing.
+        # Every session drains the scale's whole history, so a weighing whose
+        # advertisement falls in that gap arrives with the next session.
+        self._session_pending = False
+        self._cooldown_started_at: float = 0.0
         # Background poll task that checks HA's BT cache for the scale and
         # schedules a session if we see it. Works around cases where HA's
         # callback dispatcher doesn't fire for subsequent advertisements.
@@ -184,7 +185,7 @@ class MedisanaBSCoordinator:
         self._set_available(True)
 
         now = time.monotonic()
-        if now - self._last_session_scheduled_at < _SESSION_COOLDOWN_SECONDS:
+        if self._session_pending or now - self._cooldown_started_at < _SESSION_COOLDOWN_SECONDS:
             # Silent: the scale emits many adverts per second; logging each
             # one floods the log without adding signal.
             return
@@ -195,12 +196,17 @@ class MedisanaBSCoordinator:
             service_info.rssi,
             ADVERTISEMENT_TO_SESSION_DELAY_SECONDS,
         )
-        self._last_session_scheduled_at = now
+        self._cooldown_started_at = now
+        self._session_pending = True
         self.hass.async_create_task(self._run_delayed_session())
 
     async def _run_delayed_session(self) -> None:
-        await asyncio.sleep(ADVERTISEMENT_TO_SESSION_DELAY_SECONDS)
-        await self._run_session_locked()
+        try:
+            await asyncio.sleep(ADVERTISEMENT_TO_SESSION_DELAY_SECONDS)
+            await self._run_session_locked()
+        finally:
+            self._session_pending = False
+            self._cooldown_started_at = time.monotonic()
 
     async def _poll_loop(self) -> None:
         """Backup path: feed adverts the callback never receives.
